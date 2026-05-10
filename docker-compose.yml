@@ -248,8 +248,8 @@ services:
       POSTGRES_DB: ai_db
       POSTGRES_USER: ai
       POSTGRES_PASSWORD: ai
-      AZURE_FOUNDRY_BASE_URL: ${AZURE_FOUNDRY_BASE_URL}
-      AZURE_FOUNDRY_API_KEY: ${AZURE_FOUNDRY_API_KEY}
+      AZURE_FOUNDRY_BASE_URL: ${AZURE_FOUNDRY_BASE_URL:-foudry-base-url.com}
+      AZURE_FOUNDRY_API_KEY: ${AZURE_FOUNDRY_API_KEY:-foudry-api-key}
       AI_MODEL: ${AI_MODEL:-gpt-5.1}
       JAVA_OPTS: -Xmx512m -Xms256m
     ports:
