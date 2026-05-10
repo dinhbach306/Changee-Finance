@@ -248,8 +248,8 @@ services:
       POSTGRES_DB: ai_db
       POSTGRES_USER: ai
       POSTGRES_PASSWORD: ai
-      AZURE_FOUNDRY_BASE_URL: ${AZURE_FOUNDRY_BASE_URL:-https://dev-foundry-space-sea.services.ai.azure.com/api/projects/proj-default/openai}
-      AZURE_FOUNDRY_API_KEY: ${AZURE_FOUNDRY_API_KEY:-GlXejfQ9vGF5t3hEuKQVdmh7N7HH6mOBXkeOzqPYVw74Zoe48Ir0JQQJ99CEACqBBLyXJ3w3AAAAACOGL5Zh}
+      AZURE_FOUNDRY_BASE_URL: ${AZURE_FOUNDRY_BASE_URL:-foudry-base-url.com}
+      AZURE_FOUNDRY_API_KEY: ${AZURE_FOUNDRY_API_KEY:-foudry-api-key}
       AI_MODEL: ${AI_MODEL:-gpt-5.1}
       JAVA_OPTS: -Xmx512m -Xms256m
     ports:

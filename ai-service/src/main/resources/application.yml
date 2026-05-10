@@ -22,8 +22,8 @@ spring:
     # Azure AI Foundry exposes an OpenAI-compatible path at /openai, so set:
     #   AZURE_FOUNDRY_BASE_URL=https://<your-resource>.services.ai.azure.com/openai
     openai:
-      base-url: ${AZURE_FOUNDRY_BASE_URL:https://dev-foundry-space-sea.services.ai.azure.com/api/projects/proj-default/openai}
-      api-key: ${AZURE_FOUNDRY_API_KEY:GlXejfQ9vGF5t3hEuKQVdmh7N7HH6mOBXkeOzqPYVw74Zoe48Ir0JQQJ99CEACqBBLyXJ3w3AAAAACOGL5Zh}
+      base-url: ${AZURE_FOUNDRY_BASE_URL:foundry-base-url}
+      api-key: ${AZURE_FOUNDRY_API_KEY:foundry-api-key}
       chat:
         options:
           # The deployment name you set when deploying Claude in Foundry.
