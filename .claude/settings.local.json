@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(curl -s 'https://search.maven.org/solrsearch/select?q=g:org.springframework.cloud+AND+a:spring-cloud-dependencies&rows=15&core=gav&wt=json')",
+      "Bash(python3 -c \"import sys, json; d=json.load\\(sys.stdin\\); [print\\(x['v']\\) for x in d['response']['docs']]\")",
+      "Bash(curl -s 'https://search.maven.org/solrsearch/select?q=g:org.springframework.cloud+AND+a:spring-cloud-dependencies&rows=20&core=gav&wt=json')",
+      "Bash(curl -s 'https://search.maven.org/solrsearch/select?q=g:org.springframework.boot+AND+a:spring-boot&rows=20&core=gav&wt=json')",
+      "Bash(curl -s 'https://search.maven.org/solrsearch/select?q=g:org.springframework.boot+AND+a:spring-boot-starter-parent&rows=10&core=gav&wt=json')",
+      "Bash(curl -s 'https://search.maven.org/solrsearch/select?q=g:org.springframework.cloud+AND+a:spring-cloud-starter-gateway&rows=10&core=gav&wt=json')",
+      "Bash(curl -s -f -o /dev/null http://localhost:8761/actuator/health)",
+      "Bash(curl -s http://localhost:8761/actuator/health)",
+      "Bash(curl -s -H 'Accept: application/json' http://localhost:8761/eureka/apps)",
+      "Bash(curl -s http://localhost:8084/actuator/circuitbreakers)",
+      "Bash(curl -s http://localhost:8084/actuator/health/circuitBreakers)",
+      "Bash(curl -s 'https://hub.docker.com/v2/repositories/apache/kafka/tags?page_size=15&ordering=last_updated')",
+      "Bash(docker stop *)",
+      "Bash(docker rm *)",
+      "Bash(curl -s -X POST http://localhost:8080/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"alice\",\"password\":\"password123\"}')",
+      "Bash(sed 's/.*\"accessToken\":\"\\\\\\([^\"]*\\\\\\)\".*/\\\\1/' /tmp/alice2.json)",
+      "Bash(sed 's/.*\"userId\":\"\\\\\\([^\"]*\\\\\\)\".*/\\\\1/' /tmp/alice2.json)",
+      "Bash(curl -s -X POST http://localhost:8080/api/accounts -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"type\":\"CHECKING\"}')",
+      "Bash(curl -s -X POST http://localhost:8080/api/accounts -H 'Authorization: Bearer __TRACKED_VAR__' -H 'Content-Type: application/json' -d '{\"type\":\"SAVINGS\"}')",
+      "Bash(curl -s 'https://hub.docker.com/v2/repositories/otel/opentelemetry-collector-contrib/tags?page_size=20&ordering=last_updated')",
+      "Bash(curl -s 'https://hub.docker.com/v2/repositories/otel/opentelemetry-collector-contrib/tags?page_size=100&ordering=last_updated')",
+      "Bash(curl -s 'https://hub.docker.com/v2/repositories/otel/opentelemetry-collector-contrib/tags?page=2&page_size=100&ordering=last_updated')",
+      "Bash(curl -s -f -o /dev/null http://localhost:8080/actuator/health)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('datadog-dashboard.json','utf8'\\)\\); console.log\\('JSON valid'\\)\")",
+      "Bash(python -c \"import json; json.load\\(open\\('datadog-dashboard.json'\\)\\); print\\('JSON valid'\\)\")",
+      "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\('datadog-dashboard.json','utf8'\\)\\); console.log\\('JSON valid'\\); console.log\\('widgets:', d.widgets.length\\); console.log\\('template_variables:', d.template_variables.map\\(t=>t.name\\).join\\(','\\)\\)\")",
+      "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\('datadog-dashboard.json','utf8'\\)\\); console.log\\('JSON valid'\\); console.log\\('widgets:', d.widgets.length\\)\")",
+      "Bash(awk '/Resource attributes/,/InstrumentationScope/')",
+      "Bash(awk '/-> service.name: Str\\\\\\(api-gateway\\\\\\)/,/^[^ ]/')",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('datadog-dashboard.json','utf8'\\)\\); console.log\\('dashboard JSON valid'\\)\")",
+      "Bash(mvn -q -B -pl ai-service -am compile -DskipTests)",
+      "PowerShell(Get-Command *)",
+      "Bash(curl *)"
+    ]
+  }
+}

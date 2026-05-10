@@ -1,0 +1,406 @@
+{
+  "title": "Changee Finance - Microservices Observability",
+  "description": "OTEL → OpenTelemetry Collector → Datadog. APM tổng hợp, JVM, Kafka, hostmetrics & logs.",
+  "layout_type": "ordered",
+  "reflow_type": "fixed",
+  "tags": ["team:changee"],
+
+  "template_variables": [
+    { "name": "service", "prefix": "service",
+      "available_values": ["api-gateway","auth-service","user-service","account-service","transaction-service","notification-service"],
+      "default": "*" },
+    { "name": "env", "prefix": "env", "available_values": ["local"], "default": "local" },
+    { "name": "host", "prefix": "host", "available_values": ["changee-finance-local"], "default": "*" }
+  ],
+
+  "widgets": [
+
+    { "definition": {
+        "type": "note",
+        "content": "## 🚀 APM Overview\nKPIs từ HTTP server spans. KHÔNG cần đi từng service — toàn bộ trace + service map ở dashboard này.",
+        "background_color": "vivid_purple", "font_size": "16", "text_align": "left",
+        "show_tick": false, "tick_pos": "50%", "tick_edge": "bottom" },
+      "layout": { "x": 0, "y": 0, "width": 12, "height": 1 } },
+
+    { "definition": {
+        "type": "query_value", "title": "Requests / sec (all services)", "title_size": "16", "title_align": "left",
+        "autoscale": true, "precision": 2,
+        "requests": [{
+          "response_format": "scalar",
+          "queries": [{
+            "name": "q",
+            "data_source": "spans",
+            "search": { "query": "$service $env @_top_level:1" },
+            "indexes": ["*"],
+            "compute": { "aggregation": "count" }
+          }],
+          "formulas": [{ "formula": "q / 60" }],
+          "conditional_formats": [{ "comparator": ">", "value": 0, "palette": "white_on_green" }]
+        }]
+      },
+      "layout": { "x": 0, "y": 1, "width": 3, "height": 2 } },
+
+    { "definition": {
+        "type": "query_value", "title": "Error Rate (5xx %)", "title_size": "16", "title_align": "left",
+        "autoscale": true, "precision": 2,
+        "requests": [{
+          "response_format": "scalar",
+          "queries": [
+            { "name": "errors", "data_source": "spans",
+              "search": { "query": "$service $env @http.status_code:5* type:server" },
+              "indexes": ["*"], "compute": { "aggregation": "count" } },
+            { "name": "total",  "data_source": "spans",
+              "search": { "query": "$service $env type:server" },
+              "indexes": ["*"], "compute": { "aggregation": "count" } }
+          ],
+          "formulas": [{ "formula": "(errors / total) * 100" }],
+          "conditional_formats": [
+            { "comparator": ">",  "value": 5,  "palette": "white_on_red" },
+            { "comparator": ">",  "value": 1,  "palette": "white_on_yellow" },
+            { "comparator": "<=", "value": 1,  "palette": "white_on_green" } ]
+        }]
+      },
+      "layout": { "x": 3, "y": 1, "width": 3, "height": 2 } },
+
+    { "definition": {
+        "type": "query_value", "title": "P95 Latency (ms)", "title_size": "16", "title_align": "left",
+        "autoscale": true, "precision": 0,
+        "requests": [{
+          "response_format": "scalar",
+          "queries": [{
+            "name": "q", "data_source": "spans",
+            "search": { "query": "$service $env type:server" },
+            "indexes": ["*"], "compute": { "aggregation": "pc95", "metric": "@duration" }
+          }],
+          "formulas": [{ "formula": "q / 1000000" }],
+          "conditional_formats": [
+            { "comparator": ">",  "value": 1000, "palette": "white_on_red" },
+            { "comparator": ">",  "value": 500,  "palette": "white_on_yellow" },
+            { "comparator": "<=", "value": 500,  "palette": "white_on_green" } ]
+        }]
+      },
+      "layout": { "x": 6, "y": 1, "width": 3, "height": 2 } },
+
+    { "definition": {
+        "type": "query_value", "title": "Active Services", "title_size": "16", "title_align": "left",
+        "autoscale": true, "precision": 0,
+        "requests": [{
+          "q": "count_not_null(avg:jvm.thread.count{$env} by {service})",
+          "aggregator": "last",
+          "conditional_formats": [
+            { "comparator": ">=", "value": 6, "palette": "white_on_green" },
+            { "comparator": ">=", "value": 1, "palette": "white_on_yellow" },
+            { "comparator": "<",  "value": 1, "palette": "white_on_red" } ]
+        }]
+      },
+      "layout": { "x": 9, "y": 1, "width": 3, "height": 2 } },
+
+    { "definition": {
+        "type": "note",
+        "content": "## 🗺️ Service Map & Per-Service Health\nTopology + tổng quan throughput / latency / error cho TẤT CẢ service trong 1 chỗ.",
+        "background_color": "vivid_blue", "font_size": "16", "text_align": "left",
+        "show_tick": false, "tick_pos": "50%", "tick_edge": "bottom" },
+      "layout": { "x": 0, "y": 3, "width": 12, "height": 1 } },
+
+    { "definition": {
+        "type": "servicemap",
+        "service": "api-gateway",
+        "filters": ["env:local"],
+        "title": "Service Map (root: api-gateway)", "title_size": "16", "title_align": "left"
+      },
+      "layout": { "x": 0, "y": 4, "width": 12, "height": 4 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "📈 Throughput by service (req/min)",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [{
+          "response_format": "timeseries",
+          "queries": [{
+            "name": "rps", "data_source": "spans",
+            "search": { "query": "$service $env type:server" },
+            "indexes": ["*"], "compute": { "aggregation": "count" },
+            "group_by": [{ "facet": "service", "limit": 10, "sort": { "aggregation": "count", "order": "desc" } }]
+          }],
+          "formulas": [{ "formula": "rps" }],
+          "display_type": "line",
+          "style": { "palette": "dog_classic", "line_type": "solid", "line_width": "normal" }
+        }],
+        "yaxis": { "scale": "linear", "include_zero": true }
+      },
+      "layout": { "x": 0, "y": 8, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "⏱️ P95 Latency by service (ms)",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [{
+          "response_format": "timeseries",
+          "queries": [{
+            "name": "lat", "data_source": "spans",
+            "search": { "query": "$service $env type:server" },
+            "indexes": ["*"], "compute": { "aggregation": "pc95", "metric": "@duration" },
+            "group_by": [{ "facet": "service", "limit": 10, "sort": { "aggregation": "pc95", "metric": "@duration", "order": "desc" } }]
+          }],
+          "formulas": [{ "formula": "lat / 1000000" }],
+          "display_type": "line",
+          "style": { "palette": "warm" }
+        }],
+        "yaxis": { "scale": "linear", "include_zero": true }
+      },
+      "layout": { "x": 6, "y": 8, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "toplist", "title": "🐢 Top 10 slowest operations (P95)",
+        "title_size": "16", "title_align": "left",
+        "requests": [{
+          "response_format": "scalar",
+          "queries": [{
+            "name": "lat", "data_source": "spans",
+            "search": { "query": "$service $env type:server" },
+            "indexes": ["*"], "compute": { "aggregation": "pc95", "metric": "@duration" },
+            "group_by": [
+              { "facet": "service", "limit": 10 },
+              { "facet": "@resource", "limit": 10, "sort": { "aggregation": "pc95", "metric": "@duration", "order": "desc" } }
+            ]
+          }],
+          "formulas": [{ "formula": "lat / 1000000", "alias": "P95 (ms)" }]
+        }]
+      },
+      "layout": { "x": 0, "y": 11, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "toplist", "title": "🔴 Top error operations (count)",
+        "title_size": "16", "title_align": "left",
+        "requests": [{
+          "response_format": "scalar",
+          "queries": [{
+            "name": "errs", "data_source": "spans",
+            "search": { "query": "$service $env status:error" },
+            "indexes": ["*"], "compute": { "aggregation": "count" },
+            "group_by": [
+              { "facet": "service", "limit": 10 },
+              { "facet": "@resource", "limit": 10, "sort": { "aggregation": "count", "order": "desc" } }
+            ]
+          }],
+          "formulas": [{ "formula": "errs" }]
+        }]
+      },
+      "layout": { "x": 6, "y": 11, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "note",
+        "content": "## 📨 Kafka Messaging\nQuery span-based (OTel agent không emit metric messaging.* trực tiếp — chỉ spans).",
+        "background_color": "vivid_orange", "font_size": "16", "text_align": "left",
+        "show_tick": false, "tick_pos": "50%", "tick_edge": "bottom" },
+      "layout": { "x": 0, "y": 14, "width": 12, "height": 1 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "📤 Kafka Publish Rate by topic",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [{
+          "response_format": "timeseries",
+          "queries": [{
+            "name": "pub", "data_source": "spans",
+            "search": { "query": "$env @messaging.system:kafka @messaging.operation:publish" },
+            "indexes": ["*"], "compute": { "aggregation": "count" },
+            "group_by": [{ "facet": "@messaging.destination.name", "limit": 5, "sort": { "aggregation": "count", "order": "desc" } }]
+          }],
+          "formulas": [{ "formula": "pub" }],
+          "display_type": "bars",
+          "style": { "palette": "cool" }
+        }],
+        "yaxis": { "scale": "linear", "include_zero": true }
+      },
+      "layout": { "x": 0, "y": 15, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "📥 Kafka Consume Rate by topic",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [{
+          "response_format": "timeseries",
+          "queries": [{
+            "name": "con", "data_source": "spans",
+            "search": { "query": "$env @messaging.system:kafka @messaging.operation:process" },
+            "indexes": ["*"], "compute": { "aggregation": "count" },
+            "group_by": [{ "facet": "@messaging.destination.name", "limit": 5, "sort": { "aggregation": "count", "order": "desc" } }]
+          }],
+          "formulas": [{ "formula": "con" }],
+          "display_type": "bars",
+          "style": { "palette": "purple" }
+        }],
+        "yaxis": { "scale": "linear", "include_zero": true }
+      },
+      "layout": { "x": 6, "y": 15, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "query_value", "title": "Total Kafka events (last interval)", "title_size": "16", "title_align": "left",
+        "autoscale": true, "precision": 0,
+        "requests": [{
+          "response_format": "scalar",
+          "queries": [{
+            "name": "all_kafka", "data_source": "spans",
+            "search": { "query": "$env @messaging.system:kafka" },
+            "indexes": ["*"], "compute": { "aggregation": "count" }
+          }],
+          "formulas": [{ "formula": "all_kafka" }],
+          "conditional_formats": [{ "comparator": ">", "value": 0, "palette": "white_on_green" }]
+        }]
+      },
+      "layout": { "x": 0, "y": 18, "width": 4, "height": 2 } },
+
+    { "definition": {
+        "type": "toplist", "title": "🔝 Top consumer groups by throughput",
+        "title_size": "16", "title_align": "left",
+        "requests": [{
+          "response_format": "scalar",
+          "queries": [{
+            "name": "cg", "data_source": "spans",
+            "search": { "query": "$env @messaging.system:kafka @messaging.operation:process" },
+            "indexes": ["*"], "compute": { "aggregation": "count" },
+            "group_by": [{ "facet": "@messaging.kafka.consumer.group", "limit": 10, "sort": { "aggregation": "count", "order": "desc" } }]
+          }],
+          "formulas": [{ "formula": "cg" }]
+        }]
+      },
+      "layout": { "x": 4, "y": 18, "width": 8, "height": 2 } },
+
+    { "definition": {
+        "type": "note",
+        "content": "## ☕ JVM Metrics — OTel Java agent",
+        "background_color": "vivid_green", "font_size": "16", "text_align": "left",
+        "show_tick": false, "tick_pos": "50%", "tick_edge": "bottom" },
+      "layout": { "x": 0, "y": 20, "width": 12, "height": 1 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "🧠 Heap Used (MB) by service",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [{
+          "q": "avg:jvm.memory.used{$service,$env,jvm.memory.type:heap} by {service} / 1048576",
+          "display_type": "area", "style": { "palette": "blue" } }],
+        "yaxis": { "scale": "linear", "include_zero": true }
+      },
+      "layout": { "x": 0, "y": 21, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "🔄 GC Duration (s/s) by service",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [{
+          "q": "sum:jvm.gc.duration.sum{$service,$env} by {service,jvm.gc.action}.as_rate()",
+          "display_type": "bars", "style": { "palette": "warm" } }],
+        "yaxis": { "scale": "linear", "include_zero": true }
+      },
+      "layout": { "x": 6, "y": 21, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "🧵 Threads / 💻 JVM CPU%",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [
+          { "q": "avg:jvm.thread.count{$service,$env} by {service}",
+            "display_type": "line", "style": { "palette": "purple" } },
+          { "q": "avg:jvm.cpu.recent_utilization{$service,$env} by {service} * 100",
+            "display_type": "line", "style": { "palette": "orange" }, "on_right_yaxis": true }
+        ],
+        "yaxis":       { "scale": "linear", "include_zero": true },
+        "right_yaxis": { "scale": "linear", "include_zero": true, "max": "100" }
+      },
+      "layout": { "x": 0, "y": 24, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "🔗 DB Connection Pool",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [
+          { "q": "avg:db.client.connections.usage{$service,$env,state:used} by {service,pool.name}",
+            "display_type": "line", "style": { "palette": "blue" } },
+          { "q": "avg:db.client.connections.usage{$service,$env,state:idle} by {service,pool.name}",
+            "display_type": "line", "style": { "palette": "grey", "line_type": "dashed" } }
+        ],
+        "yaxis": { "scale": "linear", "include_zero": true }
+      },
+      "layout": { "x": 6, "y": 24, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "note",
+        "content": "## 🖥️ Host / System (OTel hostmetrics)",
+        "background_color": "vivid_yellow", "font_size": "16", "text_align": "left",
+        "show_tick": false, "tick_pos": "50%", "tick_edge": "bottom" },
+      "layout": { "x": 0, "y": 27, "width": 12, "height": 1 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "💻 CPU Utilization (%) by state",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [{ "q": "avg:system.cpu.utilization{$host} by {state} * 100",
+                       "display_type": "area", "style": { "palette": "warm" } }],
+        "yaxis": { "scale": "linear", "include_zero": true, "max": "100" }
+      },
+      "layout": { "x": 0, "y": 28, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "💾 Memory Usage (GB) by state",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [{ "q": "avg:system.memory.usage{$host} by {state} / 1073741824",
+                       "display_type": "area", "style": { "palette": "cool" } }],
+        "yaxis": { "scale": "linear", "include_zero": true }
+      },
+      "layout": { "x": 6, "y": 28, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "🌐 Network I/O (bytes/s)",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [{ "q": "sum:system.network.io{$host} by {direction}.as_rate()",
+                       "display_type": "line", "style": { "palette": "purple" } }],
+        "yaxis": { "scale": "linear", "include_zero": true }
+      },
+      "layout": { "x": 0, "y": 31, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "💽 Disk I/O (bytes/s)",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [{ "q": "sum:system.disk.io{$host} by {direction}.as_rate()",
+                       "display_type": "line", "style": { "palette": "green" } }],
+        "yaxis": { "scale": "linear", "include_zero": true }
+      },
+      "layout": { "x": 6, "y": 31, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "note",
+        "content": "## 📋 Logs",
+        "background_color": "vivid_pink", "font_size": "16", "text_align": "left",
+        "show_tick": false, "tick_pos": "50%", "tick_edge": "bottom" },
+      "layout": { "x": 0, "y": 34, "width": 12, "height": 1 } },
+
+    { "definition": {
+        "type": "timeseries", "title": "📊 Log volume by service & status",
+        "title_size": "16", "title_align": "left", "show_legend": true, "legend_layout": "horizontal",
+        "requests": [{
+          "response_format": "timeseries",
+          "queries": [{
+            "name": "logs", "data_source": "logs",
+            "search": { "query": "$service $env" },
+            "indexes": ["*"], "compute": { "aggregation": "count" },
+            "group_by": [
+              { "facet": "service", "limit": 10, "sort": { "aggregation": "count", "order": "desc" } },
+              { "facet": "status",  "limit": 5,  "sort": { "aggregation": "count", "order": "desc" } }
+            ]
+          }],
+          "formulas": [{ "formula": "logs" }],
+          "style": { "palette": "dog_classic" },
+          "display_type": "bars"
+        }],
+        "yaxis": { "scale": "linear", "include_zero": true }
+      },
+      "layout": { "x": 0, "y": 35, "width": 6, "height": 3 } },
+
+    { "definition": {
+        "type": "log_stream", "title": "📋 Live error/warn log stream",
+        "title_size": "16", "title_align": "left",
+        "query": "$service (status:error OR status:warn) $env",
+        "sort": { "column": "time", "order": "desc" },
+        "columns": ["host", "service", "status", "@message"],
+        "indexes": [],
+        "message_display": "expanded-md",
+        "show_date_column": true,
+        "show_message_column": true
+      },
+      "layout": { "x": 6, "y": 35, "width": 6, "height": 3 } }
+
+  ]
+}

@@ -1,0 +1,27 @@
+# Datadog Agent receives OTLP traces, metrics, and logs from each microservice
+# (each Spring Boot container runs the OpenTelemetry Java agent and exports OTLP/gRPC).
+
+api_key: "${DD_API_KEY}"
+site: "${DD_SITE}"
+
+logs_enabled: true
+apm_config:
+  enabled: true
+process_config:
+  enabled: "true"
+
+otlp_config:
+  receiver:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  logs:
+    enabled: true
+  metrics:
+    enabled: true
+    resource_attributes_as_tags: true
+  traces:
+    enabled: true
+    span_name_as_resource_name: true

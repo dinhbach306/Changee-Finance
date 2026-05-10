@@ -1,0 +1,270 @@
+name: changee-finance
+
+x-otel-env: &otel-env
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_LOGS_EXPORTER: otlp
+  OTEL_METRICS_EXPORTER: otlp
+  OTEL_TRACES_EXPORTER: otlp
+  OTEL_RESOURCE_ATTRIBUTES: deployment.environment=local
+
+x-eureka-env: &eureka-env
+  EUREKA_DEFAULT_ZONE: http://discovery-service:8761/eureka/
+
+services:
+
+  # ---------------- Infrastructure ----------------
+
+  kafka:
+    image: apache/kafka:4.2.0
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      # KRaft mode (no Zookeeper). Single-node combined broker+controller.
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: changee-finance-kraft-cluster
+    networks: [backend]
+
+  redis:
+    image: redis:7.4-alpine
+    networks: [backend]
+
+  postgres-auth:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth
+      POSTGRES_PASSWORD: auth
+    volumes: [pg-auth:/var/lib/postgresql/data]
+    networks: [backend]
+
+  postgres-user:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: user
+    volumes: [pg-user:/var/lib/postgresql/data]
+    networks: [backend]
+
+  postgres-account:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: account_db
+      POSTGRES_USER: account
+      POSTGRES_PASSWORD: account
+    volumes: [pg-account:/var/lib/postgresql/data]
+    networks: [backend]
+
+  postgres-transaction:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: transaction_db
+      POSTGRES_USER: transaction
+      POSTGRES_PASSWORD: transaction
+    volumes: [pg-transaction:/var/lib/postgresql/data]
+    networks: [backend]
+
+  postgres-notification:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: notification
+      POSTGRES_PASSWORD: notification
+    volumes: [pg-notification:/var/lib/postgresql/data]
+    networks: [backend]
+
+  postgres-ai:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ai_db
+      POSTGRES_USER: ai
+      POSTGRES_PASSWORD: ai
+    ports:
+      - "5436:5432"
+    volumes: [pg-ai:/var/lib/postgresql/data]
+    networks: [backend]
+
+  # ---------------- Observability ----------------
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.151.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      DD_API_KEY: ${DD_API_KEY}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+    volumes:
+      - ./docker/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+      # hostmetrics receiver scrapes these (Linux). On Docker Desktop these are the VM's namespaces.
+      - /proc:/hostfs/proc:ro
+      - /sys:/hostfs/sys:ro
+      - /:/hostfs:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    networks: [backend]
+
+  # ---------------- Microservices ----------------
+
+  discovery-service:
+    build:
+      context: .
+      dockerfile: discovery-service/Dockerfile
+    environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: discovery-service
+      JAVA_OPTS: -Xmx512m -Xms256m
+    ports:
+      - "8761:8761"
+    networks: [backend]
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    environment:
+      <<: [*otel-env, *eureka-env]
+      OTEL_SERVICE_NAME: api-gateway
+      REDIS_HOST: redis
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER:-changee-finance}
+      JAVA_OPTS: -Xmx512m -Xms256m
+    ports:
+      - "8080:8080"
+    depends_on: [discovery-service, redis, otel-collector]
+    networks: [backend]
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    environment:
+      <<: [*otel-env, *eureka-env]
+      OTEL_SERVICE_NAME: auth-service
+      POSTGRES_HOST: postgres-auth
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth
+      POSTGRES_PASSWORD: auth
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER:-changee-finance}
+      JAVA_OPTS: -Xmx512m -Xms256m
+    ports:
+      - "8081:8081"
+    depends_on: [discovery-service, postgres-auth, otel-collector]
+    networks: [backend]
+
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+    environment:
+      <<: [*otel-env, *eureka-env]
+      OTEL_SERVICE_NAME: user-service
+      POSTGRES_HOST: postgres-user
+      POSTGRES_DB: user_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: user
+      JAVA_OPTS: -Xmx512m -Xms256m
+    ports:
+      - "8082:8082"
+    depends_on: [discovery-service, postgres-user, otel-collector]
+    networks: [backend]
+
+  account-service:
+    build:
+      context: .
+      dockerfile: account-service/Dockerfile
+    environment:
+      <<: [*otel-env, *eureka-env]
+      OTEL_SERVICE_NAME: account-service
+      POSTGRES_HOST: postgres-account
+      POSTGRES_DB: account_db
+      POSTGRES_USER: account
+      POSTGRES_PASSWORD: account
+      JAVA_OPTS: -Xmx512m -Xms256m
+    ports:
+      - "8083:8083"
+    depends_on: [discovery-service, postgres-account, otel-collector]
+    networks: [backend]
+
+  transaction-service:
+    build:
+      context: .
+      dockerfile: transaction-service/Dockerfile
+    environment:
+      <<: [*otel-env, *eureka-env]
+      OTEL_SERVICE_NAME: transaction-service
+      POSTGRES_HOST: postgres-transaction
+      POSTGRES_DB: transaction_db
+      POSTGRES_USER: transaction
+      POSTGRES_PASSWORD: transaction
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JAVA_OPTS: -Xmx512m -Xms256m
+    ports:
+      - "8084:8084"
+    depends_on: [discovery-service, postgres-transaction, kafka, otel-collector]
+    networks: [backend]
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    environment:
+      <<: [*otel-env, *eureka-env]
+      OTEL_SERVICE_NAME: notification-service
+      POSTGRES_HOST: postgres-notification
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: notification
+      POSTGRES_PASSWORD: notification
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JAVA_OPTS: -Xmx512m -Xms256m
+    ports:
+      - "8085:8085"
+    depends_on: [discovery-service, postgres-notification, kafka, otel-collector]
+    networks: [backend]
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: ai-service/Dockerfile
+    environment:
+      <<: [*otel-env, *eureka-env]
+      OTEL_SERVICE_NAME: ai-service
+      POSTGRES_HOST: postgres-ai
+      POSTGRES_DB: ai_db
+      POSTGRES_USER: ai
+      POSTGRES_PASSWORD: ai
+      AZURE_FOUNDRY_BASE_URL: ${AZURE_FOUNDRY_BASE_URL:-https://dev-foundry-space-sea.services.ai.azure.com/api/projects/proj-default/openai}
+      AZURE_FOUNDRY_API_KEY: ${AZURE_FOUNDRY_API_KEY:-GlXejfQ9vGF5t3hEuKQVdmh7N7HH6mOBXkeOzqPYVw74Zoe48Ir0JQQJ99CEACqBBLyXJ3w3AAAAACOGL5Zh}
+      AI_MODEL: ${AI_MODEL:-gpt-5.1}
+      JAVA_OPTS: -Xmx512m -Xms256m
+    ports:
+      - "8086:8086"
+    depends_on: [discovery-service, postgres-ai, otel-collector]
+    networks: [backend]
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  pg-auth:
+  pg-user:
+  pg-account:
+  pg-transaction:
+  pg-notification:
+  pg-ai:

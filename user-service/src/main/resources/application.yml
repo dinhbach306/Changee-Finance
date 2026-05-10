@@ -1,0 +1,38 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: user-service
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:postgres-user}:${POSTGRES_PORT:5432}/${POSTGRES_DB:user_db}
+    username: ${POSTGRES_USER:user}
+    password: ${POSTGRES_PASSWORD:user}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://discovery-service:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+resilience4j:
+  ratelimiter:
+    instances:
+      userServiceRl:
+        limit-for-period: 50
+        limit-refresh-period: 1s
+        timeout-duration: 50ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

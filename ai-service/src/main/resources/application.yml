@@ -1,0 +1,51 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: ai-service
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:postgres-ai}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ai_db}
+    username: ${POSTGRES_USER:ai}
+    password: ${POSTGRES_PASSWORD:ai}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  ai:
+    # Spring AI's OpenAI client final URL is `${base-url}/v1/chat/completions`.
+    # Azure AI Foundry exposes an OpenAI-compatible path at /openai, so set:
+    #   AZURE_FOUNDRY_BASE_URL=https://<your-resource>.services.ai.azure.com/openai
+    openai:
+      base-url: ${AZURE_FOUNDRY_BASE_URL:https://dev-foundry-space-sea.services.ai.azure.com/api/projects/proj-default/openai}
+      api-key: ${AZURE_FOUNDRY_API_KEY:GlXejfQ9vGF5t3hEuKQVdmh7N7HH6mOBXkeOzqPYVw74Zoe48Ir0JQQJ99CEACqBBLyXJ3w3AAAAACOGL5Zh}
+      chat:
+        options:
+          # The deployment name you set when deploying Claude in Foundry.
+          model: ${AI_MODEL:gpt-5.1}
+          temperature: 0.4
+          max-completion-tokens: 1024
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: always
+            platform: postgresql
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://discovery-service:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
